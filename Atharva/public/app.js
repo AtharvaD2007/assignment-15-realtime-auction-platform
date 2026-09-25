@@ -1,5 +1,7 @@
 // ================== Live Auction Floor — Client ==================
-const socket = io(); // same-origin; works locally and on any deployment host
+const socket = io("https://assignment-15-realtime-auction-platform-icla.onrender.com",{
+    transports: ["websocket", "polling"]
+  });
 
 // ---- DOM refs ----
 const joinScreen = document.getElementById('joinScreen');
@@ -31,7 +33,7 @@ let state = {
   closed: false
 };
 
-// ---- Audio cues (tiny beeps via WebAudio, no external assets needed) ----
+
 function beep(freq = 440, duration = 120, type = 'sine') {
   try {
     const ctx = beep.ctx || (beep.ctx = new (window.AudioContext || window.webkitAudioContext)());
@@ -46,7 +48,7 @@ function beep(freq = 440, duration = 120, type = 'sine') {
   } catch (e) { /* audio not available, fail silently */ }
 }
 
-// ---- Populate auction list before joining ----
+
 fetch('/api/auctions')
   .then((r) => r.json())
   .then((list) => {
