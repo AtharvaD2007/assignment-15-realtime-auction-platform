@@ -1,11 +1,11 @@
 /**
  * sockets/timerManager.js
  * -----------------------
- * Owns one authoritative server-side setInterval per auction room. Clients
- * never run their own countdown logic for the "truth" — they just render
- * whatever `timeRemainingSeconds` the server broadcasts every second. This
- * is what keeps every bidder's clock perfectly synchronized regardless of
- * network latency or tab-throttling on the client.
+ * Authoritative server-side auction timers.
+ *
+ * TEMPORARY TESTING MODE:
+ * When the countdown reaches 0, the auction does NOT end.
+ * The timer simply resets to 60 seconds and continues.
  */
 
 const { auctions } = require('../data/auctions');
@@ -15,6 +15,7 @@ const activeIntervals = {};
 
 function tick(io, auctionId) {
   const auction = auctions[auctionId];
+
   if (!auction || auction.status !== 'active') {
     clearAuctionTimer(auctionId);
     return;
@@ -22,9 +23,16 @@ function tick(io, auctionId) {
 
   auction.timeRemainingSeconds -= 1;
 
+  // TEMPORARY TESTING MODE
+  // Do not close the auction when the timer reaches 0.
   if (auction.timeRemainingSeconds <= 0) {
-    auction.timeRemainingSeconds = 0;
-    endAuction(io, auctionId);
+    auction.timeRemainingSeconds = 60;
+
+    io.to(auctionId).emit('auction:time_tick', {
+      auctionId,
+      timeRemaining: auction.timeRemainingSeconds
+    });
+
     return;
   }
 
@@ -35,10 +43,16 @@ function tick(io, auctionId) {
 }
 
 function startAuctionTimer(io, auctionId) {
-  if (activeIntervals[auctionId]) return; // already running
-  activeIntervals[auctionId] = setInterval(() => tick(io, auctionId), 1000);
+  if (activeIntervals[auctionId]) return;
+
+  activeIntervals[auctionId] = setInterval(() => {
+    tick(io, auctionId);
+  }, 1000);
 }
 
+/**
+ * Stops the timer for one auction.
+ */
 function clearAuctionTimer(auctionId) {
   if (activeIntervals[auctionId]) {
     clearInterval(activeIntervals[auctionId]);
@@ -46,38 +60,63 @@ function clearAuctionTimer(auctionId) {
   }
 }
 
-/** Starts the countdown for every auction currently marked "active". */
+/**
+ * Starts the countdown for every auction currently marked active.
+ */
 function startAllTimers(io) {
   Object.values(auctions).forEach((auction) => {
-    if (auction.status === 'active') startAuctionTimer(io, auction.id);
+    if (auction.status === 'active') {
+      startAuctionTimer(io, auction.id);
+    }
   });
 }
 
 /**
- * Anti-snipe hook: bump the remaining time for an in-progress auction.
- * The auction's setInterval is already running (started at server boot),
- * so this only needs to rewrite the counter — the next tick() picks it up.
+ * Anti-snipe hook.
+ *
+ * If a bid happens near the end, the auction engine can call:
+ *
+ * extendTimer(auctionId, 20)
+ *
+ * The timer will continue from 20 seconds.
  */
 function extendTimer(auctionId, extraSeconds) {
   const auction = auctions[auctionId];
+
   if (!auction) return;
+
   auction.timeRemainingSeconds = extraSeconds;
 }
 
-/** Called when the clock hits zero: closes the auction and announces the result. */
+/**
+ * Kept for compatibility with the rest of the application.
+ *
+ * IMPORTANT:
+ * This function is no longer called automatically when the
+ * countdown reaches 0.
+ *
+ * It can still be used later when you want to implement
+ * the real auction ending behavior.
+ */
 function endAuction(io, auctionId) {
   const auction = auctions[auctionId];
+
   if (!auction) return;
 
   clearAuctionTimer(auctionId);
 
-  const wasSold = !!auction.highestBidder && auction.currentBid >= auction.reservePrice;
+  const wasSold =
+    !!auction.highestBidder &&
+    auction.currentBid >= auction.reservePrice;
+
   auction.status = wasSold ? 'sold' : 'ended';
 
   io.to(auctionId).emit('auction:sold', {
     auctionId,
     status: auction.status,
-    winner: auction.highestBidder ? auction.highestBidder.username : null,
+    winner: auction.highestBidder
+      ? auction.highestBidder.username
+      : null,
     finalPrice: auction.currentBid,
     message: wasSold
       ? `SOLD to ${auction.highestBidder.username} for ₹${auction.currentBid.toLocaleString('en-IN')}!`
@@ -85,7 +124,9 @@ function endAuction(io, auctionId) {
   });
 }
 
-/** Graceful shutdown helper — clears every interval so the process can exit cleanly. */
+/**
+ * Graceful shutdown helper.
+ */
 function stopAllTimers() {
   Object.keys(activeIntervals).forEach(clearAuctionTimer);
 }
