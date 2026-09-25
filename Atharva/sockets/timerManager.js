@@ -4,8 +4,8 @@
  * Authoritative server-side auction timers.
  *
  * TEMPORARY TESTING MODE:
- * When the countdown reaches 0, the auction does NOT end.
- * The timer simply resets to 60 seconds and continues.
+ * Auctions do NOT end when the countdown reaches 0.
+ * The timer resets to the auction's initial time and continues.
  */
 
 const { auctions } = require('../data/auctions');
@@ -13,9 +13,13 @@ const { auctions } = require('../data/auctions');
 // auctionId -> Node interval handle
 const activeIntervals = {};
 
+/**
+ * Runs every second for an active auction.
+ */
 function tick(io, auctionId) {
   const auction = auctions[auctionId];
 
+  // Stop timer if auction doesn't exist or is no longer active
   if (!auction || auction.status !== 'active') {
     clearAuctionTimer(auctionId);
     return;
@@ -23,10 +27,17 @@ function tick(io, auctionId) {
 
   auction.timeRemainingSeconds -= 1;
 
-  // TEMPORARY TESTING MODE
-  // Do not close the auction when the timer reaches 0.
+  /**
+   * TEMPORARY TESTING MODE
+   *
+   * When countdown reaches 0:
+   * - DO NOT end auction
+   * - DO NOT change status
+   * - DO NOT emit auction:sold
+   * - Reset to the original auction duration
+   */
   if (auction.timeRemainingSeconds <= 0) {
-    auction.timeRemainingSeconds = 60;
+    auction.timeRemainingSeconds = auction.initialTimeSeconds;
 
     io.to(auctionId).emit('auction:time_tick', {
       auctionId,
@@ -36,14 +47,20 @@ function tick(io, auctionId) {
     return;
   }
 
+  // Broadcast authoritative server time
   io.to(auctionId).emit('auction:time_tick', {
     auctionId,
     timeRemaining: auction.timeRemainingSeconds
   });
 }
 
+/**
+ * Starts one auction timer.
+ */
 function startAuctionTimer(io, auctionId) {
-  if (activeIntervals[auctionId]) return;
+  if (activeIntervals[auctionId]) {
+    return;
+  }
 
   activeIntervals[auctionId] = setInterval(() => {
     tick(io, auctionId);
@@ -51,7 +68,7 @@ function startAuctionTimer(io, auctionId) {
 }
 
 /**
- * Stops the timer for one auction.
+ * Clears one auction timer.
  */
 function clearAuctionTimer(auctionId) {
   if (activeIntervals[auctionId]) {
@@ -61,7 +78,7 @@ function clearAuctionTimer(auctionId) {
 }
 
 /**
- * Starts the countdown for every auction currently marked active.
+ * Starts timers for every currently active auction.
  */
 function startAllTimers(io) {
   Object.values(auctions).forEach((auction) => {
@@ -72,36 +89,33 @@ function startAllTimers(io) {
 }
 
 /**
- * Anti-snipe hook.
+ * Anti-snipe timer extension.
  *
- * If a bid happens near the end, the auction engine can call:
- *
- * extendTimer(auctionId, 20)
- *
- * The timer will continue from 20 seconds.
+ * Example:
+ * extendTimer('AUC_VINTAGE_99', 20)
  */
-function extendTimer(auctionId, extraSeconds) {
+function extendTimer(auctionId, seconds) {
   const auction = auctions[auctionId];
 
-  if (!auction) return;
+  if (!auction) {
+    return;
+  }
 
-  auction.timeRemainingSeconds = extraSeconds;
+  auction.timeRemainingSeconds = seconds;
 }
 
 /**
- * Kept for compatibility with the rest of the application.
+ * Real auction-ending function.
  *
- * IMPORTANT:
- * This function is no longer called automatically when the
- * countdown reaches 0.
- *
- * It can still be used later when you want to implement
- * the real auction ending behavior.
+ * This is intentionally NOT called automatically by tick()
+ * while testing mode is enabled.
  */
 function endAuction(io, auctionId) {
   const auction = auctions[auctionId];
 
-  if (!auction) return;
+  if (!auction) {
+    return;
+  }
 
   clearAuctionTimer(auctionId);
 
@@ -125,7 +139,7 @@ function endAuction(io, auctionId) {
 }
 
 /**
- * Graceful shutdown helper.
+ * Graceful shutdown.
  */
 function stopAllTimers() {
   Object.keys(activeIntervals).forEach(clearAuctionTimer);
