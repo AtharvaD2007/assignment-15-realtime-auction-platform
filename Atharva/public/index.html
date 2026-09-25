@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🔨 Live Auction Floor</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== JOIN SCREEN ===== -->
+  <div id="joinScreen" class="join-screen">
+    <div class="join-card">
+      <h1>🔨 Live Auction Floor</h1>
+      <p class="subtitle">Real-time bidding · anti-snipe protected · authoritative server clock</p>
+
+      <label for="usernameInput">Your display name</label>
+      <input id="usernameInput" type="text" maxlength="30" placeholder="e.g. Vikram" autocomplete="off" />
+
+      <label for="auctionSelect">Choose an auction room</label>
+      <select id="auctionSelect"></select>
+
+      <button id="joinBtn">Enter Trading Floor</button>
+      <p id="joinError" class="error-text"></p>
+    </div>
+  </div>
+
+  <!-- ===== AUCTION FLOOR ===== -->
+  <div id="floorScreen" class="floor-screen hidden">
+    <header class="floor-header">
+      <div class="header-left">
+        <span class="live-dot"></span>
+        <h2 id="itemTitle">Loading...</h2>
+      </div>
+      <div class="header-right">
+        <span id="viewerCount" class="viewer-count">👁 0</span>
+        <span id="walletBalance" class="wallet-balance"></span>
+      </div>
+    </header>
+
+    <main class="floor-main">
+      <section class="auction-panel">
+        <p id="itemDescription" class="item-description"></p>
+
+        <div class="price-row">
+          <div class="current-bid-block">
+            <span class="label">Current Bid</span>
+            <span id="currentBid" class="current-bid">₹0</span>
+            <span id="highestBidder" class="highest-bidder"></span>
+          </div>
+          <div class="timer-block">
+            <span class="label">Time Left</span>
+            <span id="timer" class="timer">--</span>
+          </div>
+        </div>
+
+        <div id="bannerZone"></div>
+
+        <div class="bid-controls">
+          <button id="quickBidBtn" class="quick-bid">Bid Min Increment</button>
+          <input id="bidAmountInput" type="number" placeholder="Custom amount" />
+          <button id="placeBidBtn" class="place-bid">Place Bid</button>
+        </div>
+        <p id="bidError" class="error-text"></p>
+        <p id="statusMsg" class="status-msg"></p>
+      </section>
+
+      <aside class="history-panel">
+        <h3>Live Bid Activity</h3>
+        <ul id="bidHistoryList" class="bid-history-list"></ul>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
