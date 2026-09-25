@@ -1,7 +1,9 @@
 // ================== Live Auction Floor — Client ==================
-const socket = io("https://assignment-15-realtime-auction-platform-icla.onrender.com",{
-    transports: ["websocket", "polling"]
-  });
+// ================== Live Auction Floor — Client ==================
+
+const socket = io("https://assignment-15-realtime-auction-platform-icla.onrender.com", {
+  transports: ["websocket", "polling"]
+});
 
 // ---- DOM refs ----
 const joinScreen = document.getElementById('joinScreen');
@@ -49,7 +51,7 @@ function beep(freq = 440, duration = 120, type = 'sine') {
 }
 
 
-fetch('/api/auctions')
+fetch('https://assignment-15-realtime-auction-platform-icla.onrender.com/api/auctions')
   .then((r) => r.json())
   .then((list) => {
     auctionSelect.innerHTML = list
@@ -95,7 +97,9 @@ socket.on('auction:init', ({ item, timeRemaining, walletBalance }) => {
   itemTitle.textContent = item.title;
   itemDescription.textContent = item.description;
   currentBidEl.textContent = formatINR(item.currentBid);
-  highestBidderEl.textContent = item.highestBidder ? `Leading: ${item.highestBidder}` : 'No bids yet';
+  highestBidderEl.textContent = item.highestBidder
+  ? `Leading: ${item.highestBidder.username}`
+  : 'No bids yet';
   timerEl.textContent = `${timeRemaining}s`;
   walletBalanceEl.textContent = formatINR(walletBalance);
   quickBidBtn.textContent = `Bid ₹${(item.currentBid + item.minIncrement).toLocaleString('en-IN')}`;
